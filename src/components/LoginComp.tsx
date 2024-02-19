@@ -1,43 +1,66 @@
 import React, { useEffect } from "react";
-import { Button } from '@/components/ui/button';
-import Image from 'next/image';
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import GoogleIcon from "../assets/svgs/google-icon.svg";
-import { useSelector , useDispatch } from "react-redux";
-import {logIn, logOut, initialUserState} from '@/features/userstate/userStateSlice'
-import {getAuth, GoogleAuthProvider, signInWithPopup} from 'firebase/auth'
+import { useSelector, useDispatch } from "react-redux";
+import {
+  logIn,
+  logOut,
+  initialUserState,
+} from "@/features/userstate/userStateSlice";
+import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import app from "@/auth/providers/firebase";
 const LoginComp = () => {
-  const dispatch = useDispatch()
-  const user = useSelector(initialUserState)
-
+  const dispatch = useDispatch();
+  const router = useRouter();
   useEffect(() => {
-      const auth = getAuth(app)
-      console.log("Auth",auth)
-      console.log("After Auth")
-      const unSubscribe = auth.onAuthStateChanged((user) => {
-        console.log("User Infor",user)
-        if(user){
-          dispatch(logIn(user))
-        }
-        else{
-          dispatch(logOut())
-        }
-      })
-      console.log("subscribe or not",unSubscribe)
+    const auth = getAuth(app);
+    console.log("Auth", auth);
+    console.log("After Auth");
+    const unSubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        dispatch(logIn(user));
+      } else {
+        dispatch(logOut());
+      }
+    });
+    return () => unSubscribe();
+  }, []);
 
-      return () => unSubscribe()
-  },[])
+  async function continueWithGoogle() : Promise<void> {
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
 
-  const continueWithGoogle = async () => {
-    const auth = getAuth(app)
-    const provider = new GoogleAuthProvider()
-    console.log("Provider",provider)
     try {
-      await signInWithPopup(auth , provider)
+      const results = await signInWithPopup(auth, provider);
+      console.log("Results are",results)
+      const idToken = await results.user.getIdToken()
+      console.log("First" , idToken)
+      sendIdTokenToServer(idToken)
+      console.log("SECOND" , idToken)
+      router.push("/optionspage");
+    } catch (error: unknown) {
+      console.error("Error Sign In With Google");
     }
-    catch(error : unknown){
-      console.error("Error Sign In With Google")
-    }
+  };
+  async function sendIdTokenToServer(idToken : String)  {
+    console.log("Third" , idToken)
+    fetch('http://localhost:3001/api/google-signin', {
+      method: 'POST',
+      mode:'cors',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ idToken }),
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('User data stored on server:', data);
+    })
+    .catch(error => {
+      console.error('Error sending ID token to server:', error);
+    });
   }
   return (
     <>
@@ -52,10 +75,19 @@ const LoginComp = () => {
           {/* Login Section */}
           <div className="flex flex-col items-center justify-center space-y-6">
             <span className="text-4xl font-bold md:text-5xl">Log in</span>
-            
+
             {/* Google Login Button */}
-            <Button onClick = {continueWithGoogle} variant="outline" className="w-[20rem] flex space-x-3 items-center justify-center">
-              <Image src={GoogleIcon} alt="Google Icon" width={15} height={15} />
+            <Button
+              onClick={continueWithGoogle}
+              variant="outline"
+              className="w-[20rem] flex space-x-3 items-center justify-center"
+            >
+              <Image
+                src={GoogleIcon}
+                alt="Google Icon"
+                width={15}
+                height={15}
+              />
               <span>Continue with Google</span>
             </Button>
           </div>
@@ -66,7 +98,8 @@ const LoginComp = () => {
           {/* Terms and Conditions */}
           <div className="text-xs text-gray-400 text-center">
             <span>
-              By clicking “Continue with Google” above, you acknowledge that you have read and understood, and agree to StudySphere's{' '}
+              By clicking “Continue with Google” above, you acknowledge that you
+              have read and understood, and agree to StudySphere's{" "}
             </span>
             <a className="underline">Terms & Conditions</a>
             <span>and</span>
